@@ -1,0 +1,8 @@
+·þÎñÆ÷´î½¨£º
+https://www.cnblogs.com/sien6/p/8194368.html
+
+1.sudo -s
+2.service vsftpd status
+3.ftp://10.64.211.122
+zyc_ftp
+123456
