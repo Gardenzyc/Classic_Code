@@ -1,6 +1,15 @@
 ·þÎñÆ÷´î½¨£º
 https://www.cnblogs.com/sien6/p/8194368.html
 
+ftp://10.64.207.14/
+cat /etc/vsftpd.conf
+mkdir /etc/vsftpd
+vi /etc/vsftpd/chroot_list #Username
+vi /etc/vsftpd.conf
+chroot_list_file=/etc/vsftpd/chroot_list
+Watchdog Rmu
+passwd ftpuser
+
 1.sudo -s
 2.service vsftpd status
 3.ftp://10.64.211.122
