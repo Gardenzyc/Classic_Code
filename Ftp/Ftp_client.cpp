@@ -447,7 +447,7 @@ int ftp_cd(FILE *control_stream, const char *FoldName)
 	return 0;
 }
  
-int ftp_send(ftp_host_info_t *server, FILE *control_stream,
+int ftp_upload(ftp_host_info_t *server, FILE *control_stream,
 		const char *server_path, char *local_path)
 {
 	struct stat sbuf;
@@ -461,7 +461,7 @@ int ftp_send(ftp_host_info_t *server, FILE *control_stream,
 		ftp_die("PASV", buf);
 		return -1;
 	}
-	fd_data = xconnect_ftpdata(server, buf);
+	fd_data = xconnect_ftpdata(server, buf);//data socket
 	if(fd_data == -1)
 		return -1;
 	/* get the local file */
@@ -529,8 +529,80 @@ int ftp_send(ftp_host_info_t *server, FILE *control_stream,
 		ftp_die("close", buf);
 		return -1;
 	}
-	return EXIT_SUCCESS;
+	return OK;
 }
+
+int ftp_download(ftp_host_info_t *server, FILE *control_stream,
+		const char *server_path, char *local_path)
+{
+	struct stat sbuf;
+	char buf[512];
+	int fd_data;
+	int fd_local;
+	int response;
+ 	printf("ftp download start...\n");
+	/*  Connect to the data socket */
+	if (ftpcmd("PASV", NULL, control_stream, buf) != 227) {
+		ftp_die("PASV", buf);
+		return -1;
+	}
+	fd_data = xconnect_ftpdata(server, buf);//data socket
+	if(fd_data == -1)
+		return -1;
+ 
+	response = ftpcmd("RETR", server_path, control_stream, buf);
+	switch (response) {
+		case 125:
+		case 150:
+			break;
+		default:
+			{
+				xclose(fd_data);
+				xclose(fd_local);
+				ftp_die("RETR", buf);
+				return -1;
+			}
+	}
+
+	/* get the local file, if NULL then create */
+	fd_local = STDIN_FILENO;
+	if (NOT_LONE_DASH(local_path)) {
+		fd_local = xopen(local_path, O_CREAT | O_RDWR);
+		while(fd_local == -1)
+		{
+			xclose(fd_local);
+			sleep(1);
+			fd_local = xopen(local_path, O_CREAT | O_RDWR);
+		}
+		fstat(fd_local, &sbuf);
+		printf("creat local file for download : %d\n", sbuf.st_size);
+	}
+	
+	/* transfer the file  */
+	ftpmissions_t missionlist={0,0};
+	ftpbackupmission_info_t filelist={0,0};
+	do{
+		do{
+			if (bb_copyfd_eof(fd_data, fd_local) == -1) {
+				/* close it all down */
+				xclose(fd_data);
+				xclose(fd_local);
+				return -1;
+			//exit(EXIT_FAILURE);
+	 		 }
+		}while(filelist.currfilelist_id++<=filelist.len_filelist);
+	}while (missionlist.currmission_id++<=missionlist.len_missionlist);
+ 
+	/* close it all down */
+	close(fd_data);
+	close(fd_local);
+	if (ftpcmd(NULL, NULL, control_stream, buf) != 226) {
+		ftp_die("close", buf);
+		return -1;
+	}
+	return OK;
+}
+
 int ftp_quit(FILE *control_stream)
 {
 	if (control_stream == NULL)
@@ -543,13 +615,18 @@ int ftp_quit(FILE *control_stream)
 	return 0;
 }
 
-Client_Param_t ClientParam = {
+Client_Param_t g_ClientParam = {
 	.UserName = "zyc_ftp",
 	.Passwd = "123456",
 	.ServerIp = "192.168.56.101",
 	.Port = 21,
 	.Session = NULL
 };
+
+void Ftp_SetLoginServInfo(Client_Param_t *ClientCurParam)
+{
+	memcpy(&g_ClientParam, ClientCurParam, sizeof(Client_Param_t));
+}
 
 int Ftp_LoginCmd(void)
 {
@@ -559,13 +636,13 @@ int Ftp_LoginCmd(void)
 	{
 		return ERROR;
 	}
-	server->user = ClientParam.UserName;
-	server->password = ClientParam.Passwd;
-	server->lsa = xhost2sockaddr(ClientParam.ServerIp, 21);
-	printf("Connecting to %s (%s)\n", ClientParam.ServerIp, \
+	server->user = g_ClientParam.UserName;
+	server->password = g_ClientParam.Passwd;
+	server->lsa = xhost2sockaddr(g_ClientParam.ServerIp, 21);
+	printf("Connecting to %s (%s)\n", g_ClientParam.ServerIp, \
 			xmalloc_sockaddr2dotted(&server->lsa->sa));
-	ClientParam.Session  = ftp_login(server);
-	if(NULL == ClientParam.Session)
+	g_ClientParam.Session  = ftp_login(server);
+	if(NULL == g_ClientParam.Session)
 	{
 		return ERROR;
 	}
@@ -573,49 +650,61 @@ int Ftp_LoginCmd(void)
 }
 
 /* 涓婁紶鑷虫湇鍔″櫒鏂囦欢鍚嶏紝鏈湴鏂囦欢鍚?*/
-int Ftp_SendCmd(const char *server_path, char *local_path)
+int Ftp_SendCmd(const char *server_path, char *local_path, char *cmd)
 {
 	ftp_host_info_t *server = (ftp_host_info_t *)malloc(sizeof(ftp_host_info_t));
 	server = (ftp_host_info_t *)malloc(sizeof(*server));
-	server->user = ClientParam.UserName;
-	server->password = ClientParam.Passwd;
-	server->lsa = xhost2sockaddr(ClientParam.ServerIp, ClientParam.Port);
+	server->user = g_ClientParam.UserName;
+	server->password = g_ClientParam.Passwd;
+	server->lsa = xhost2sockaddr(g_ClientParam.ServerIp, g_ClientParam.Port);
 	
-	if(NULL == ClientParam.Session)
+	if(NULL == g_ClientParam.Session)
 	{
 		return ERROR;
 	}
-	return ftp_send(server, ClientParam.Session, server_path, local_path);
+
+	if(0 == strcmp(CMD_UPLOAD_FILE, cmd))
+	{
+		return ftp_upload(server, g_ClientParam.Session, server_path, local_path);
+	}
+	else if(0 == strcmp(CMD_DOWNLOAD_FILE, cmd))
+	{
+		return ftp_download(server, g_ClientParam.Session, server_path, local_path);
+	}
+	else
+	{
+		return ERROR;
+	}
 }
 
 int Ftp_MkdirCmd(char *DirName)
 {
-	if(NULL == ClientParam.Session || NULL == DirName)
+	if(NULL == g_ClientParam.Session || NULL == DirName)
 	{
 		return ERROR;
 	}
-	return ftp_mkdir(ClientParam.Session, DirName);
+	return ftp_mkdir(g_ClientParam.Session, DirName);
 }
 
 int Ftp_CdCmd(char *DirName)
 {
 	int Ret;
-	if(NULL == ClientParam.Session || NULL == DirName)
+	if(NULL == g_ClientParam.Session || NULL == DirName)
 	{
 		return ERROR;
 	}
-	Ret = ftp_cd(ClientParam.Session, "RMU_MAXSUS_TEST");
+	Ret = ftp_cd(g_ClientParam.Session, "RMU_MAXSUS_TEST");
 	if (Ret < 0)
 	{
 		Ftp_MkdirCmd(DirName);
-		Ret = ftp_cd(ClientParam.Session, DirName);
+		Ret = ftp_cd(g_ClientParam.Session, DirName);
 	}
 	return Ret;
 }
 
 void Ftp_QuitCmd(void)
 {
-	ftp_quit(ClientParam.Session);
+	ftp_quit(g_ClientParam.Session);
 }
 
 void Ftp_MdfProc(void)
@@ -630,11 +719,33 @@ int Ftp_UploadFile(char *ServerNm, char *LocalLink)
 	{
 		return ERROR;
 	}
-	if(ERROR == Ftp_SendCmd( ServerNm, LocalLink))
+	if(ERROR == Ftp_SendCmd( ServerNm, LocalLink, CMD_UPLOAD_FILE))
 	{
 		Ftp_QuitCmd();
-		printf("\nConnecting to %s (%d)\n", ClientParam.ServerIp, ClientParam.Port);
-		while(ClientParam.Session == NULL)
+		printf("\nConnecting to %s (%d)\n", g_ClientParam.ServerIp, g_ClientParam.Port);
+		while(g_ClientParam.Session == NULL)
+		{
+			printf("reconnect...\n");
+			Ftp_LoginCmd();
+		}
+		return ERROR;
+	}
+
+	return OK;
+}
+
+/* ServerNm: server file name; LocalLink: local path + file name */
+int Ftp_DownloadFile(char *ServerNm, char *LocalLink)
+{
+	if(NULL == ServerNm || NULL == LocalLink)
+	{
+		return ERROR;
+	}
+	if(ERROR == Ftp_SendCmd( ServerNm, LocalLink, CMD_DOWNLOAD_FILE))
+	{
+		Ftp_QuitCmd();
+		printf("\nConnecting to %s (%d)\n", g_ClientParam.ServerIp, g_ClientParam.Port);
+		while(g_ClientParam.Session == NULL)
 		{
 			printf("reconnect...\n");
 			Ftp_LoginCmd();
@@ -670,11 +781,11 @@ int Ftp_SearchFileUpload(char *DirPath, char *SearchCon)
 		{
 			printf("Search filename : %s\n", DretFd->d_name);
 			snprintf(LocalPath, sizeof(LocalPath), "%s/%s", DirPath, DretFd->d_name);
-			if(ERROR == Ftp_SendCmd( DretFd->d_name, LocalPath))
+			if(ERROR == Ftp_SendCmd( DretFd->d_name, LocalPath, CMD_UPLOAD_FILE))
 			{
 				Ftp_QuitCmd();
-				printf("\nConnecting to %s (%d)\n", ClientParam.ServerIp, ClientParam.Port);
-				while(ClientParam.Session == NULL)
+				printf("\nConnecting to %s (%d)\n", g_ClientParam.ServerIp, g_ClientParam.Port);
+				while(g_ClientParam.Session == NULL)
 				{
 					printf("reconnect...\n");
 					Ftp_LoginCmd();

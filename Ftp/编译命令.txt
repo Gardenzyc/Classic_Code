@@ -1,2 +1,4 @@
 1.gcc Ftp_client.cpp -shared -fPIC -o libftp_client.so -lpthread -lrt -w
 2.gcc -o test Ftp_test.cpp ./libftp_client.so -lpthread -w
+
+kill -9 PID

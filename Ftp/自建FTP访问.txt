@@ -1,4 +1,4 @@
-服务器搭建：
+1)服务器搭建：
 https://www.cnblogs.com/sien6/p/8194368.html
 
 ftp://10.64.207.14/
@@ -15,3 +15,23 @@ passwd ftpuser
 3.ftp://10.64.211.122
 zyc_ftp
 123456
+
+
+2)curl:
+1.查看连接情况：curl -u kunyiftp:kunyivm123 -0 47.100.3.199
+2.查看服务器文件列表：curl ftp://47.100.3.199 -u "kunyiftp:kunyivm123"
+3.上传文件：curl ftp://47.100.3.199 -u "kunyiftp:kunyivm123" -T "maxus.bin"
+4.curl ftp://47.100.3.199/RMU_MAXSUS/curl_cmd_test.txt -u "kunyiftp:kunyivm123"
+5.下载：curl ftp://47.100.3.199/rec_1053_2019-05-05-12_44_33.dat -u "kunyiftp:kunyivm123" -O
+
+curl -u zyc_ftp:123456 -0 192.168.56.101
+curl ftp://192.168.56.101 -u "zyc_ftp:123456" 
+
+/etc/vsftpd.conf
+/etc/vsftpd.chroot_list
+service vsftpd restart
+sudo chmod -R 777 RMU_MAXSUS_TEST/
+
+用户名：zyc_ftp 
+密码：123456
+根目录：/home/ftp/

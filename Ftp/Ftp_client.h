@@ -42,6 +42,9 @@ using namespace std;
 #define FILE_NAME_LEN 128
 #define FILE_PATH_LEN 256
 
+#define CMD_DOWNLOAD_FILE "RETR"
+#define CMD_UPLOAD_FILE "STOR"
+
 typedef struct{
 	const char *UserName;
 	const char *Passwd;
@@ -86,7 +89,7 @@ typedef struct{
 	uint8_t Data[FRAME_SIZE];
 }FtpMqInfo_t;
 
-extern Client_Param_t ClientParam;
+extern Client_Param_t g_ClientParam;
 
 #ifdef  __cplusplus
 extern "C" 
@@ -97,7 +100,7 @@ extern "C"
 	/* 鐧诲綍FTP鏈嶅姟鍣?*/
 	int Ftp_LoginCmd(void);
 	/* 涓婁紶鑷虫湇鍔″櫒鏂囦欢鍚嶏紝鏈湴鏂囦欢鍚?*/
-	int Ftp_SendCmd(const char *server_path, char *local_path);
+	int Ftp_SendCmd(const char *server_path, char *local_path, char *cmd);
 	/* 鍒涘缓FTP 鏈嶅姟鍣ㄧ洰褰?*/
 	int Ftp_MkdirCmd(char *DirName);
 	/* 鍒囨崲杩滅▼鏈嶅姟鍣ㄧ洰褰?*/
@@ -118,6 +121,10 @@ extern "C"
 	int Ftp_MqInit(void);
 	void* Ftp_MqRecvTask(void *param);
 	void* Ftp_MqSendTask(void *param);
+	void Ftp_SetLoginServInfo(Client_Param_t *ClientCurParam);
+	int Ftp_UploadFile(char *ServerNm, char *LocalLink);
+	int Ftp_DownloadFile(char *ServerNm, char *LocalLink);
+	
 #ifdef __cplusplus
 }
 #endif
