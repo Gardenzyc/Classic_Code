@@ -1,0 +1,1 @@
+gcc -o test test.c ./libcJSON.so -lm # Á¬½Ó math.h ¿â -lm 
