@@ -28,6 +28,7 @@
 #include <stdbool.h>
 
 #define NAME_MAX_LEN 64
+#define TIME_FORMAT_LEN 20//"2019-07-20_15:02:33\0"
 
 typedef struct{
 	uint32_t MessageID;
@@ -47,8 +48,8 @@ typedef struct{
 	uint32_t MessageID;
 	uint8_t MessageName[NAME_MAX_LEN];
 	uint8_t SignalName[NAME_MAX_LEN];
-	unsigned Value;
-	char Time[15];
+	double Value;
+	char Time[TIME_FORMAT_LEN];
 }MsgUpInfo_t;
 
 static Dlist_t s_MsgConfList;
@@ -103,6 +104,29 @@ void ParseTspMsgConf(cJSON *json)
 		printf("File Manager is not empty, %d:%s:%d:%d:%d:%f\n", pMsgNode->MessageID, pMsgNode->MessageName, \
 			pMsgNode->ByteOrder, pMsgNode->MessageSize, pMsgNode->MsgCycleTime, pMsgNode->SignalPrecision);
 	}
+}
+
+char *CompactMsgToTsp(MsgUpInfo_t *pMsgUpInfo)
+{
+	char *Out;
+	cJSON *Fmt = NULL;
+	cJSON *root=cJSON_CreateArray();
+	cJSON_AddItemToArray(root, Fmt = cJSON_CreateObject());
+	cJSON_AddBoolToObject(Fmt, "MessageID", pMsgUpInfo->MessageID);
+	cJSON_AddStringToObject(Fmt, "MessageName", pMsgUpInfo->MessageName);
+	cJSON_AddStringToObject(Fmt, "SignalName", pMsgUpInfo->SignalName);
+	cJSON_AddNumberToObject(Fmt, "Value", pMsgUpInfo->Value);
+	cJSON_AddStringToObject(Fmt, "Time", pMsgUpInfo->Time);
+	Out = cJSON_Print(root);
+	printf("CompactMsgToTsp:\n%s\n", Out);
+	cJSON_Delete(root);
+	return Out;
+}
+
+void FreeCompactMsg(char *Out)
+{
+	if(NULL != Out)
+		free(Out);
 }
 
 /* Parse text to JSON, then render back to text, and print! */
@@ -244,5 +268,12 @@ int main (int argc, const char * argv[]) {
 	create_objects();
 	printf("Garden test:\n");
 	dofile("./test.json");
+
+	MsgUpInfo_t MsgUpInfoTem = {
+		255,"ZYC_TEST_MSG","ZYC_TEST_SIGNAL", 66.88, "2019-07-20_16:38:12"
+	};
+	char *Out = CompactMsgToTsp(&MsgUpInfoTem);
+	printf("%s\n", Out);
+	FreeCompactMsg(Out);
 	return 0;
 }
