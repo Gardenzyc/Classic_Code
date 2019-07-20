@@ -22,10 +22,91 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdint.h>
 #include "cJSON.h"
+#include "Dlist.h"
+#include <stdbool.h>
+
+#define NAME_MAX_LEN 64
+
+typedef struct{
+	uint32_t MessageID;
+	uint8_t MessageSize;
+	uint16_t SignalLength;
+	uint16_t SignalBeginBit;
+	uint8_t MessageName[NAME_MAX_LEN];
+	uint8_t SignalName[NAME_MAX_LEN];
+	float SignalPrecision;
+	uint16_t MsgCycleTime;
+	uint8_t ByteOrder;
+	uint8_t Res;
+	Dlist_t Node;
+}MsgConfInfo_t;
+
+typedef struct{
+	uint32_t MessageID;
+	uint8_t MessageName[NAME_MAX_LEN];
+	uint8_t SignalName[NAME_MAX_LEN];
+	unsigned Value;
+	char Time[15];
+}MsgUpInfo_t;
+
+static Dlist_t s_MsgConfList;
+
+void ParseTspMsgConf(cJSON *json)
+{
+	int MsgNum = 0;
+	int Index = 0;
+	cJSON *ArrayObject = NULL;
+	cJSON *Object = NULL;
+	Dlist_t *pList = NULL;
+	DlistInit(&s_MsgConfList);
+	MsgNum = cJSON_GetArraySize(json);
+	printf("Array Size = %d\n", MsgNum);
+	for(; Index<MsgNum; Index++)
+	{
+		if(NULL != (ArrayObject = cJSON_GetArrayItem(json, Index)))
+		{
+			MsgConfInfo_t *MsgNode = malloc(sizeof(MsgConfInfo_t));
+			if(NULL != (Object = cJSON_GetObjectItem(ArrayObject, "MessageID")))
+				MsgNode->MessageID = Object->valueint;
+			if(NULL != (Object = cJSON_GetObjectItem(ArrayObject, "MessageSize")))
+				MsgNode->MessageSize = Object->valueint;
+			if(NULL != (Object =  cJSON_GetObjectItem(ArrayObject, "SignalLength")))
+				MsgNode->SignalLength = Object->valueint;
+			if(NULL != (Object = cJSON_GetObjectItem(ArrayObject, "SignalBeginBit")))
+				MsgNode->SignalBeginBit = Object->valueint;
+			if(NULL != (Object = cJSON_GetObjectItem(ArrayObject, "MessageName")))
+			{
+				strncpy(MsgNode->MessageName, Object->valuestring, NAME_MAX_LEN);
+				MsgNode->MessageName[NAME_MAX_LEN-1] = '\0';
+			}
+			if(NULL != (Object = cJSON_GetObjectItem(ArrayObject, "SignalName")))
+			{
+				strncpy(MsgNode->SignalName, Object->valuestring, NAME_MAX_LEN);
+				MsgNode->SignalName[NAME_MAX_LEN-1] = '\0';
+			}
+			if(NULL != (Object = cJSON_GetObjectItem(ArrayObject, "SignalPrecision")))
+				MsgNode->SignalPrecision = Object->valuedouble;
+			if(NULL != (Object = cJSON_GetObjectItem(ArrayObject, "MsgCycleTime")))
+				MsgNode->MsgCycleTime = Object->valueint;
+			if(NULL != (Object = cJSON_GetObjectItem(ArrayObject, "ByteOrder")))
+				MsgNode->ByteOrder = Object->valueint;
+			if(NULL != (Object = cJSON_GetObjectItem(ArrayObject, "Res")))
+				MsgNode->Res = Object->valueint;
+			DlistAddTail(&s_MsgConfList, &MsgNode->Node);
+		}
+	}
+	while(pList = DlistQueryNext(&s_MsgConfList, pList))
+	{
+		MsgConfInfo_t *pMsgNode = GET_CONTAINER_OF(pList, MsgConfInfo_t, Node);
+		printf("File Manager is not empty, %d:%s:%d:%d:%d:%f\n", pMsgNode->MessageID, pMsgNode->MessageName, \
+			pMsgNode->ByteOrder, pMsgNode->MessageSize, pMsgNode->MsgCycleTime, pMsgNode->SignalPrecision);
+	}
+}
 
 /* Parse text to JSON, then render back to text, and print! */
-void doit(char *text)
+void doit(char *text, bool Type)
 {
 	char *out;cJSON *json;
 	
@@ -34,10 +115,13 @@ void doit(char *text)
 	else
 	{
 		out=cJSON_Print(json);
+		if(true == Type)
+			ParseTspMsgConf(json);
 		cJSON_Delete(json);
-		printf("%s\n",out);
+		printf("JSON FILE Content:\n%s\n",out);
 		free(out);
 	}
+	
 }
 
 /* Read a file, parse, render back, etc. */
@@ -47,7 +131,7 @@ void dofile(char *filename)
 	
 	f=fopen(filename,"rb");fseek(f,0,SEEK_END);len=ftell(f);fseek(f,0,SEEK_SET);
 	data=(char*)malloc(len+1);fread(data,1,len,f);fclose(f);
-	doit(data);
+	doit(data, true);
 	free(data);
 }
 
@@ -142,12 +226,13 @@ int main (int argc, const char * argv[]) {
 	char text5[]="[\n	 {\n	 \"precision\": \"zip\",\n	 \"Latitude\":  37.7668,\n	 \"Longitude\": -122.3959,\n	 \"Address\":   \"\",\n	 \"City\":      \"SAN FRANCISCO\",\n	 \"State\":     \"CA\",\n	 \"Zip\":       \"94107\",\n	 \"Country\":   \"US\"\n	 },\n	 {\n	 \"precision\": \"zip\",\n	 \"Latitude\":  37.371991,\n	 \"Longitude\": -122.026020,\n	 \"Address\":   \"\",\n	 \"City\":      \"SUNNYVALE\",\n	 \"State\":     \"CA\",\n	 \"Zip\":       \"94085\",\n	 \"Country\":   \"US\"\n	 }\n	 ]";
 
 	/* Process each json textblock by parsing, then rebuilding: */
-	doit(text1);
-	doit(text2);	
-	doit(text3);
-	doit(text4);
-	doit(text5);
-
+#if 1
+	doit(text1, false);
+	doit(text2, false);	
+	doit(text3, false);
+	doit(text4, false);
+	doit(text5, false);
+#endif
 	/* Parse standard testfiles: */
 /*	dofile("../../tests/test1"); */
 /*	dofile("../../tests/test2"); */
@@ -157,6 +242,7 @@ int main (int argc, const char * argv[]) {
 
 	/* Now some samplecode for building objects concisely: */
 	create_objects();
-	
+	printf("Garden test:\n");
+	dofile("./test.json");
 	return 0;
 }

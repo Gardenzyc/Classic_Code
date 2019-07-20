@@ -1,0 +1,22 @@
+[{
+		"MessageID":"241",
+		"MessageSize":8,
+		"MessageName":"BCM_0F1h.BrkPedTrvlAchvdRC",
+		"SignalNmae":"BCM_0F1h.BrkPedTrvlAchvdRC",
+		"SignalBeginBit":5,
+		"SignalLength":2,"Offset":3,
+		"SignalPrecision":0.52,
+		"ByteOrder":0,
+		"MsgCycleTime":3
+	},{
+		"MessageID":241,
+		"MessageSize":8,
+		"MessageName":"BCM_0F1h.BrkPedTrvlAchvdRC",
+		"SignalNmae":"BCM_0F1h.BrkPedTrvlAchvdRC",
+		"SignalBeginBit":5,
+		"SignalLength":2,"Offset":3,
+		"SignalPrecision":0.52,
+		"ByteOrder":0,
+		"MsgCycleTime":3
+	}]
+
